@@ -7,7 +7,7 @@ from matplotlib import cm
 
 T = 500
 mnorm = tfd.MultivariateNormalDiag([0, 1], [1.5, 1.5])
-noise = tfd.Normal(0, .05).sample(T * 2)
+noise = tfd.Normal(0, .005).sample(T * 2)
 noise = tf.reshape(noise, (-1, 2))
 positions = np.array([[-1., -1.]], dtype=np.float32)
 alpha = 0.3
@@ -21,7 +21,7 @@ for t in range(1, T):
     positions = np.vstack([positions, pos_t1.numpy()])
 
 max_pos, min_pos = np.max(positions), np.min(positions)
-x = tf.linspace(min_pos, max_pos, 100)
+x = tf.linspace(min_pos*1.2, max_pos*1.2, 100)
 x = tf.cast(x, tf.float32)
 xx, yy = tf.meshgrid(x, x)
 xy = tf.concat([tf.reshape(xx, (-1, 1)), tf.reshape(yy, (-1, 1))], -1)
