@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib import animation
 import argparse
+
 k = tf.keras
 layers, models, losses, activations, initializers = k.layers, k.models, k.losses, k.activations, k.initializers
 
@@ -23,20 +24,25 @@ class t_log_sigmoid(layers.Layer):
 
 
 T = 300
-sigma = 0.1
+sigma = 0.01
+N = 10
 mnorm = tfd.MultivariateNormalDiag([0, 1], [1.5, 1.5])
-noise = tfd.Normal(0, sigma).sample(T * 2)
-noise = tf.reshape(noise, (-1, 2))
-positions = np.array([[-1., -1.]], dtype=np.float32)
-alpha = 0.6
+initial_positions = tfd.Uniform(-1, 1).sample(N * 2)
+initial_positions = tf.reshape(initial_positions, (N, 2))
+noise = tfd.Normal(0, sigma).sample(N * T * 2)
+noise = tf.reshape(noise, (N, T, 2))
+positions = np.empty(shape=(N, T, 2), dtype=np.float32)
+positions[:, 0, :] = initial_positions.numpy()
+alpha = 0.2
 for t in range(1, T):
-    pos_t0 = tf.constant(positions[t - 1][None, :])
+    pos_t0 = tf.constant(positions[:, t - 1])
     with tf.GradientTape() as tape:
         tape.watch(pos_t0)
         z = mnorm.prob(pos_t0)
         grad = tape.gradient(z, pos_t0)
-    pos_t1 = pos_t0 + alpha * grad + noise[t]
-    positions = np.vstack([positions, pos_t1.numpy()])
+    pos_t1 = pos_t0 + alpha * grad + noise[:, t]
+    positions[:, t, :] = pos_t1.numpy()
+
 
 max_pos, min_pos = np.max(positions), np.min(positions)
 x = tf.linspace(min_pos * 1.2, max_pos * 1.2, 100)
@@ -56,12 +62,14 @@ grad_xx, grad_yy = tf.reshape(grad_x, (100, 100)), tf.reshape(grad_y, (100, 100)
 
 def plot_tot_traj(T):
     plt.cla()
+    alphas = np.linspace(0.01, 1, T)
     plt.contourf(xx, yy, zz)
     plt.quiver(xx[::10, ::10], yy[::10, ::10], grad_xx[::10, ::10], grad_yy[::10, ::10], width=0.003)
-    plt.scatter(*positions[0], color="red")
-    for i in range(T):
-        plt.plot(positions[i:i + 2, 0], positions[i:i + 2, 1], c=color[i])
-    plt.scatter(positions[T, 0], positions[T, 1], color=color[T])
+    #plt.scatter(positions[:, 0, 0], positions[:, 0, 1], color="red")
+    for n in range(N):
+        for t in range(T):
+            plt.plot(positions[n, t:t + 2, 0], positions[n, t:t + 2, 1], c=color[t], alpha=alphas[t])
+    plt.scatter(positions[:, T, 0], positions[:, T, 1], color=color[T])
 
 
 if __name__ == "__main__":
@@ -70,8 +78,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     save = args.save
 
-    fig = plt.figure()
-    anim = animation.FuncAnimation(fig, plot_tot_traj, frames=T-1, interval=10)
+    fig = plt.figure(figsize=(10, 10))
+    anim = animation.FuncAnimation(fig, plot_tot_traj, frames=T - 1, interval=10)
     if save:
         anim.save("./Figures/anim1.gif")
     plt.show()
